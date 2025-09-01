@@ -28,6 +28,9 @@
         <button @click="showSettings = !showSettings" class="control-btn">
           ⚙️ 设置
         </button>
+        <button @click="showKnowledge = true" class="control-btn">
+          📚 知识库
+        </button>
       </div>
     </div>
 
@@ -219,6 +222,9 @@
 
     <!-- iOS相机助手 -->
     <IOSCameraHelper ref="iosHelperRef" @permission-retry="requestPermission" />
+
+    <!-- Vue3知识库覆盖层 -->
+    <Vue3Knowledge v-if="showKnowledge" @close="showKnowledge = false" />
   </div>
 </template>
 
@@ -234,6 +240,7 @@ import {
   compressImage,
 } from '../utils/cameraUtils'
 import IOSCameraHelper from './IOSCameraHelper.vue'
+import Vue3Knowledge from './Vue3Knowledge.vue'
 
 // 响应式数据
 const videoRef = ref(null)
@@ -248,6 +255,7 @@ const permissionError = ref(false)
 const permissionErrorMessage = ref('')
 const showSettings = ref(false)
 const showHelp = ref(false)
+const showKnowledge = ref(false) // 添加知识库显示状态
 const deviceType = ref('unknown')
 const cameraInfo = ref(null)
 const videoQuality = ref('medium')
@@ -469,9 +477,32 @@ const startRecording = () => {
   if (!mediaStream) return
 
   recordedChunks = []
+
+  // 尝试创建MP4录制器
   mediaRecorder = createMediaRecorder(mediaStream, {
     audio: enableAudio.value,
   })
+
+  if (!mediaRecorder) {
+    // 如果MP4不支持，尝试WebM格式
+    try {
+      mediaRecorder = new MediaRecorder(mediaStream, {
+        mimeType: 'video/webm;codecs=vp9',
+        audio: enableAudio.value,
+      })
+    } catch (error) {
+      try {
+        // 最后尝试基本WebM格式
+        mediaRecorder = new MediaRecorder(mediaStream, {
+          mimeType: 'video/webm',
+          audio: enableAudio.value,
+        })
+      } catch (finalError) {
+        alert('您的设备不支持视频录制')
+        return
+      }
+    }
+  }
 
   if (!mediaRecorder) {
     alert('不支持视频录制')
@@ -498,7 +529,8 @@ const startRecording = () => {
 
     // 自动保存
     if (autoSave.value) {
-      const filename = `video_${Date.now()}.webm`
+      const extension = mediaRecorder.mimeType.includes('mp4') ? 'mp4' : 'webm'
+      const filename = `video_${Date.now()}.${extension}`
       saveMediaFile(blob, filename)
     }
   }
@@ -567,15 +599,17 @@ const deleteMedia = index => {
 const downloadAll = async () => {
   for (let i = 0; i < capturedMedia.value.length; i++) {
     const media = capturedMedia.value[i]
-    const filename = `${media.type}_${i + 1}_${Date.now()}.${media.type === 'photo' ? 'jpg' : 'webm'}`
 
     if (media.type === 'photo') {
+      const filename = `photo_${i + 1}_${Date.now()}.jpg`
       const blob = await dataURLToBlob(media.url)
       saveMediaFile(blob, filename)
     } else {
-      // 视频文件已经是blob，直接下载
+      // 视频文件，根据实际格式确定扩展名
       const response = await fetch(media.url)
       const blob = await response.blob()
+      const extension = blob.type.includes('mp4') ? 'mp4' : 'webm'
+      const filename = `video_${i + 1}_${Date.now()}.${extension}`
       saveMediaFile(blob, filename)
     }
   }
@@ -701,6 +735,18 @@ onUnmounted(() => {
 .control-btn:disabled {
   background: #6c757d;
   cursor: not-allowed;
+}
+
+/* 知识库按钮特殊样式 */
+.control-btn:has-text('📚') {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.control-btn:has-text('📚'):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 }
 
 .settings-panel {

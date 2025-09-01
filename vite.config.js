@@ -4,26 +4,31 @@ import { resolve } from 'path'
 
 export default defineConfig({
   plugins: [vue()],
-  base: '/ios-camera/', // GitHub Pages仓库名称
+  base: './', // 使用相对路径，适合GitHub Pages部署
   resolve: {
     alias: {
-      '@': resolve(__dirname, 'src')
-    }
+      '@': resolve(__dirname, 'src'),
+    },
   },
   server: {
     port: 3000,
-    open: true
+    open: true,
   },
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['vue'],
-          utils: ['lodash']
-        }
-      }
-    }
-  }
-}) 
+        assetFileNames: (assetInfo) => {
+          // 确保manifest.json使用相对路径
+          if (assetInfo.name === 'manifest.json') {
+            return 'manifest.json'
+          }
+          return 'assets/[name]-[hash][extname]'
+        },
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
+      },
+    },
+  },
+})

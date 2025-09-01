@@ -89,19 +89,19 @@ export const isVideoFormatSupported = mimeType => {
 // 获取最佳视频录制格式
 export const getBestVideoFormat = () => {
   const formats = [
+    'video/mp4',
     'video/webm;codecs=vp9',
     'video/webm;codecs=vp8',
     'video/webm',
-    'video/mp4',
-    'video/ogg;codecs=theora',
+    'video/ogg;codecs=theora'
   ]
-
+  
   for (const format of formats) {
     if (isVideoFormatSupported(format)) {
       return format
     }
   }
-
+  
   return null
 }
 
@@ -110,16 +110,29 @@ export const createMediaRecorder = (stream, options = {}) => {
   const defaultOptions = {
     mimeType: getBestVideoFormat(),
     videoBitsPerSecond: 2500000, // 2.5 Mbps
-    audioBitsPerSecond: 128000, // 128 kbps
+    audioBitsPerSecond: 128000   // 128 kbps
   }
-
+  
   const finalOptions = { ...defaultOptions, ...options }
-
+  
   try {
+    // 尝试创建MP4录制器
+    if (finalOptions.mimeType && finalOptions.mimeType.includes('mp4')) {
+      return new MediaRecorder(stream, finalOptions)
+    }
+    
+    // 如果MP4不支持，回退到其他格式
     return new MediaRecorder(stream, finalOptions)
   } catch (error) {
     console.error('创建媒体录制器失败:', error)
-    return null
+    
+    // 尝试使用默认格式
+    try {
+      return new MediaRecorder(stream)
+    } catch (fallbackError) {
+      console.error('回退格式也失败:', fallbackError)
+      return null
+    }
   }
 }
 
